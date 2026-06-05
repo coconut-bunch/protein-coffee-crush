@@ -1,0 +1,19 @@
+{
+  "name": "Protein Coffee Crush Tracker",
+  "short_name": "Coffee Crush",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff7fb",
+  "theme_color": "#ff7ab6",
+  "description": "A girly-pop tracker for iced protein coffee drinks.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

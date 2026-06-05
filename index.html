@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#ff7ab6">
+<title>Protein Coffee Crush Tracker</title>
+<style>
+  :root{
+    --bg:#fff7fb; --card:#ffffff; --pink:#ff7ab6; --hot:#ff4fa3; --lav:#b98cff;
+    --text:#3a2432; --muted:#7d6675; --line:#f3c5dd; --soft:#ffe3f1;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(180deg,#fff0f8 0%,#f8efff 100%);
+    color:var(--text);
+  }
+  header{background:#fff7fb;border-bottom:1px solid var(--line);padding:14px 14px 10px}
+  h1{margin:0;font-size:22px;line-height:1.15;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .wrap{padding:12px;max-width:1000px;margin:0 auto}
+  .summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 12px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px;box-shadow:0 6px 18px rgba(255,79,163,.08);min-height:64px}
+  .tile .label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  .tile .value{font-size:15px;font-weight:800;margin-top:6px;word-break:break-word}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px}
+  button{
+    appearance:none;border:0;border-radius:999px;padding:10px 14px;font-weight:800;color:white;
+    background:linear-gradient(135deg,var(--hot),var(--lav));box-shadow:0 6px 16px rgba(185,140,255,.28);cursor:pointer
+  }
+  button.secondary{background:#fff;color:var(--hot);border:1px solid var(--line)}
+  .hint{font-size:12px;color:var(--muted);margin:4px 2px 12px}
+  .tableWrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:var(--card);box-shadow:0 10px 24px rgba(255,79,163,.08)}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:880px}
+  th,td{border-bottom:1px solid #f7d5e6;padding:8px;vertical-align:middle;font-size:14px}
+  th{background:#ffe3f1;text-align:left;color:#5b3150;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  tr:last-child td{border-bottom:0}
+  input,select{
+    width:100%;min-width:70px;border:1px solid #efbad5;border-radius:12px;padding:10px 9px;background:#fff;color:var(--text);font-size:16px;outline:none
+  }
+  input:focus,select:focus{border-color:var(--hot);box-shadow:0 0 0 3px rgba(255,79,163,.16)}
+  input[type="number"]{min-width:76px}
+  .score,.verdict{font-weight:900;white-space:nowrap}
+  .score{color:#6f3ecb}
+  .delete{background:#fff;color:#b0005b;border:1px solid var(--line);box-shadow:none;padding:8px 10px}
+  .footer{margin:14px 2px 20px;font-size:12px;color:var(--muted)}
+  .hiddenFile{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>✨ Protein Coffee Crush Tracker ✨</h1>
+  <div class="sub">Find the best fucking drink ever, but make it organized.</div>
+</header>
+
+<div class="wrap">
+  <section class="summary" aria-label="Summary bar">
+    <div class="tile"><div class="label">Current Queen</div><div class="value" id="queen">No queen yet</div></div>
+    <div class="tile"><div class="label">Best Score</div><div class="value" id="bestScore">-</div></div>
+    <div class="tile"><div class="label">Drinks Tested</div><div class="value" id="count">0</div></div>
+    <div class="tile"><div class="label">Worst Offender</div><div class="value" id="worst">None</div></div>
+  </section>
+
+  <div class="actions">
+    <button id="addBtn" type="button">+ Add drink</button>
+    <button id="exportCsvBtn" type="button" class="secondary">Export CSV</button>
+    <button id="backupBtn" type="button" class="secondary">Backup data</button>
+    <button id="importBtn" type="button" class="secondary">Import backup</button>
+    <button id="clearBtn" type="button" class="secondary">Clear all</button>
+    <input id="importFile" class="hiddenFile" type="file" accept="application/json,.json">
+  </div>
+
+  <div class="hint">Best used as an installed web app. It saves on this device and can export/import backups.</div>
+
+  <div class="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:135px">Brand</th>
+          <th style="width:160px">Powder / flavor</th>
+          <th style="width:100px">Coffee</th>
+          <th style="width:115px">Sweetness</th>
+          <th style="width:105px">Smooth</th>
+          <th style="width:95px">Protein g</th>
+          <th style="width:85px">Score</th>
+          <th style="width:105px">Verdict</th>
+          <th style="width:180px">Notes</th>
+          <th style="width:70px"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="footer">Sweetness rating = balance. 5 means perfect, not “very sweet.” Export a backup before changing phones or clearing browser data.</div>
+</div>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+}
+
+(function(){
+  const STORAGE_KEY = "proteinCoffeeCrushTracker_app_v1";
+  const tbody = document.getElementById("tbody");
+  const ratingOptions = [1,2,3,4,5];
+  let rows = loadRows();
+
+  function uid(){return "r_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8)}
+  function emptyRow(){return {id:uid(), brand:"", flavor:"", coffee:"", sweetness:"", smooth:"", protein:"", notes:""}}
+
+  function loadRows(){
+    try{
+      const keys = ["proteinCoffeeCrushTracker_app_v1","proteinCoffeeCrushTracker_v4_noSticky","proteinCoffeeCrushTracker_v3"];
+      for(const key of keys){
+        const saved = JSON.parse(localStorage.getItem(key) || "[]");
+        if(Array.isArray(saved) && saved.length) return saved.map(r => ({...emptyRow(), ...r, id:r.id || uid()}));
+      }
+    }catch(e){}
+    return [emptyRow()];
+  }
+
+  function saveRows(){localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))}
+  function num(v){const n = Number(v); return Number.isFinite(n) ? n : 0}
+
+  function score(row){
+    const coffee = num(row.coffee), sweetness = num(row.sweetness), smooth = num(row.smooth);
+    const proteinScore = Math.min(num(row.protein), 30) / 30 * 5;
+    if(!coffee && !sweetness && !smooth && !num(row.protein)) return "";
+    return Math.round((coffee*.30 + sweetness*.25 + smooth*.25 + proteinScore*.20) * 20);
+  }
+
+  function verdict(s){
+    if(s === "") return "";
+    if(s >= 90) return "👑 Queen";
+    if(s >= 80) return "💖 Slay";
+    if(s >= 65) return "✨ Cute";
+    if(s >= 45) return "😬 Mid";
+    return "🚮 Nope";
+  }
+
+  function displayName(row){return [row.brand,row.flavor].filter(Boolean).join(" - ") || "Unnamed drink"}
+
+  function updateSummary(){
+    const scored = rows.map(r => ({row:r, score:score(r)})).filter(x => x.score !== "");
+    document.getElementById("count").textContent = scored.length;
+    if(!scored.length){
+      document.getElementById("queen").textContent = "No queen yet";
+      document.getElementById("bestScore").textContent = "-";
+      document.getElementById("worst").textContent = "None";
+      return;
+    }
+    scored.sort((a,b) => b.score - a.score);
+    document.getElementById("queen").textContent = displayName(scored[0].row);
+    document.getElementById("bestScore").textContent = scored[0].score + "/100";
+    document.getElementById("worst").textContent = displayName(scored[scored.length - 1].row);
+  }
+
+  function makeRatingSelect(row,key){
+    const select = document.createElement("select");
+    select.dataset.id = row.id; select.dataset.key = key;
+    const blank = document.createElement("option");
+    blank.value = ""; blank.textContent = "-"; select.appendChild(blank);
+    ratingOptions.forEach(n => {
+      const opt = document.createElement("option");
+      opt.value = String(n); opt.textContent = String(n);
+      if(String(row[key]) === String(n)) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", handleFieldChange);
+    return select;
+  }
+
+  function makeInput(row,key,type="text"){
+    const input = document.createElement("input");
+    input.type = type; input.value = row[key] ?? ""; input.dataset.id = row.id; input.dataset.key = key;
+    if(type === "number"){input.min = "0"; input.step = "1"; input.inputMode = "numeric"}
+    input.addEventListener("input", handleFieldChange);
+    input.addEventListener("change", handleFieldChange);
+    return input;
+  }
+
+  function handleFieldChange(e){
+    const el = e.target;
+    const row = rows.find(r => r.id === el.dataset.id);
+    if(!row) return;
+    row[el.dataset.key] = el.value;
+    saveRows();
+    const tr = el.closest("tr");
+    const s = score(row);
+    tr.querySelector(".score").textContent = s === "" ? "" : s + "/100";
+    tr.querySelector(".verdict").textContent = verdict(s);
+    updateSummary();
+  }
+
+  function render(){
+    tbody.innerHTML = "";
+    rows.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.dataset.id = row.id;
+      [makeInput(row,"brand"),makeInput(row,"flavor"),makeRatingSelect(row,"coffee"),makeRatingSelect(row,"sweetness"),makeRatingSelect(row,"smooth"),makeInput(row,"protein","number")]
+      .forEach(el => {const td = document.createElement("td"); td.appendChild(el); tr.appendChild(td)});
+      const s = score(row);
+      const sTd = document.createElement("td"); sTd.className = "score"; sTd.textContent = s === "" ? "" : s + "/100"; tr.appendChild(sTd);
+      const vTd = document.createElement("td"); vTd.className = "verdict"; vTd.textContent = verdict(s); tr.appendChild(vTd);
+      const notesTd = document.createElement("td"); notesTd.appendChild(makeInput(row,"notes")); tr.appendChild(notesTd);
+      const delTd = document.createElement("td");
+      const del = document.createElement("button"); del.type = "button"; del.className = "delete"; del.textContent = "Delete";
+      del.addEventListener("click", () => {rows = rows.filter(r => r.id !== row.id); if(!rows.length) rows.push(emptyRow()); saveRows(); render()});
+      delTd.appendChild(del); tr.appendChild(delTd);
+      tbody.appendChild(tr);
+    });
+    updateSummary();
+  }
+
+  function download(filename, content, type){
+    const blob = new Blob([content], {type});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+
+  document.getElementById("addBtn").addEventListener("click", () => {
+    const row = emptyRow(); rows.push(row); saveRows(); render();
+    setTimeout(() => {const el = tbody.querySelector(`tr[data-id="${row.id}"] input[data-key="brand"]`); if(el) el.focus()}, 0);
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    if(confirm("Clear the whole tracker? Export a backup first if you want to keep anything.")){
+      rows = [emptyRow()]; saveRows(); render();
+    }
+  });
+
+  document.getElementById("exportCsvBtn").addEventListener("click", () => {
+    const headers = ["Brand","Powder / flavor","Coffee","Sweetness","Smooth","Protein g","Score","Verdict","Notes"];
+    const lines = [headers.join(",")];
+    rows.forEach(r => {
+      const s = score(r);
+      const vals = [r.brand,r.flavor,r.coffee,r.sweetness,r.smooth,r.protein,s === "" ? "" : s + "/100",verdict(s),r.notes]
+        .map(v => `"${String(v ?? "").replaceAll('"','""')}"`);
+      lines.push(vals.join(","));
+    });
+    download("protein_coffee_crush_backup.csv", lines.join("\n"), "text/csv;charset=utf-8");
+  });
+
+  document.getElementById("backupBtn").addEventListener("click", () => {
+    download("protein_coffee_crush_data_backup.json", JSON.stringify(rows, null, 2), "application/json;charset=utf-8");
+  });
+
+  document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
+
+  document.getElementById("importFile").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const imported = JSON.parse(reader.result);
+        if(!Array.isArray(imported)) throw new Error("Backup was not a list.");
+        rows = imported.map(r => ({...emptyRow(), ...r, id:r.id || uid()}));
+        if(!rows.length) rows = [emptyRow()];
+        saveRows(); render();
+        alert("Backup imported.");
+      }catch(err){
+        alert("Could not import that backup file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
