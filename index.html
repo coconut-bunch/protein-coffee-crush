@@ -102,6 +102,10 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
 }
 
+if (navigator.storage && navigator.storage.persist) {
+  window.addEventListener("load", () => navigator.storage.persist().catch(() => {}));
+}
+
 (function(){
   const STORAGE_KEY = "proteinCoffeeCrushTracker_app_v1";
   const tbody = document.getElementById("tbody");
@@ -222,6 +226,12 @@ if ("serviceWorker" in navigator) {
     a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
 
+  function csvCell(value){
+    const text = String(value ?? "");
+    const safe = /^[=+\-@]/.test(text) ? "'" + text : text;
+    return `"${safe.replaceAll('"','""')}"`;
+  }
+
   document.getElementById("addBtn").addEventListener("click", () => {
     const row = emptyRow(); rows.push(row); saveRows(); render();
     setTimeout(() => {const el = tbody.querySelector(`tr[data-id="${row.id}"] input[data-key="brand"]`); if(el) el.focus()}, 0);
@@ -239,7 +249,7 @@ if ("serviceWorker" in navigator) {
     rows.forEach(r => {
       const s = score(r);
       const vals = [r.brand,r.flavor,r.coffee,r.sweetness,r.smooth,r.protein,s === "" ? "" : s + "/100",verdict(s),r.notes]
-        .map(v => `"${String(v ?? "").replaceAll('"','""')}"`);
+        .map(csvCell);
       lines.push(vals.join(","));
     });
     download("protein_coffee_crush_backup.csv", lines.join("\n"), "text/csv;charset=utf-8");
