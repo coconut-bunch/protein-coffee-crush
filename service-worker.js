@@ -1,4 +1,4 @@
-const CACHE_NAME = "protein-coffee-crush-v2";
+const CACHE_NAME = "protein-coffee-crush-v3";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", event => {
