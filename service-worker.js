@@ -1,5 +1,13 @@
-const CACHE_NAME = "protein-coffee-crush-v3";
-const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
+const CACHE_NAME = "protein-coffee-crush-v4";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./icon.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/maskable-512.png"
+];
 
 self.addEventListener("install", event => {
   event.waitUntil(
